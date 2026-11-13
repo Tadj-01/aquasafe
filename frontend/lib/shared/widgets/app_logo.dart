@@ -21,11 +21,32 @@ class AppLogo extends StatelessWidget {
     final Widget logoSymbol;
     if (AppBranding.assetLogoPath != null &&
         AppBranding.assetLogoPath!.isNotEmpty) {
-      logoSymbol = Image.asset(
-        AppBranding.assetLogoPath!,
-        width: size,
-        height: size,
-        fit: BoxFit.contain,
+      logoSymbol = ClipRRect(
+        borderRadius: BorderRadius.circular(size * 0.22),
+        child: Image.asset(
+          AppBranding.assetLogoPath!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            // Fallback to placeholder if asset cannot be loaded
+            return Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: (color ?? AppBranding.primaryBlue).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(size * 0.22),
+              ),
+              child: Center(
+                child: Icon(
+                  AppBranding.logoIcon,
+                  size: size * 0.58,
+                  color: color ?? AppBranding.primaryBlue,
+                ),
+              ),
+            );
+          },
+        ),
       );
     } else {
       // Elegant minimal water drop placeholder
