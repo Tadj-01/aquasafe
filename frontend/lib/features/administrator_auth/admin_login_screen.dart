@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/branding/app_branding.dart';
+import '../../core/constants/api_constants.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/services/auth_service.dart';
 import '../../shared/widgets/app_logo.dart';
 import '../administrator_dashboard/admin_main_screen.dart';
@@ -23,6 +25,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   String? _errorMessage;
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: ApiConstants.googleServerClientId.isNotEmpty
+        ? ApiConstants.googleServerClientId
+        : null,
     scopes: ['email', 'profile'],
   );
 
@@ -87,8 +92,20 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       final auth = await account.authentication;
       final idToken = auth.idToken;
 
-      if (idToken == null) {
-        throw Exception('Google Sign-In did not return an ID token.');
+      if (idToken == null || idToken.isEmpty) {
+        if (mounted) {
+          setState(() => _isGoogleLoading = false);
+          _showGoogleSetupDialog(
+            title: 'Google OAuth Setup Required',
+            message:
+                'On Android, Google Sign-In requires registering your app with Google Cloud Console:\n\n'
+                '• Package Name: dz.aquasafe.frontend\n'
+                '• SHA-1: 67:0E:23:9A:3B:1D:14:4A:C8:CD:8F:F9:2E:EE:32:33:66:C7:04:DA\n'
+                '• Web Client ID (serverClientId) in api_constants.dart\n\n'
+                'In the meantime, you can log in immediately using the credentials filled above (admin@aquasafe.dz / AquaSafe2026!).',
+          );
+        }
+        return;
       }
 
       final success = await AuthService.loginWithGoogle(idToken);
@@ -102,17 +119,89 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       } else if (mounted) {
         setState(() {
           _isGoogleLoading = false;
-          _errorMessage = 'Google sign-in verification failed with authority server.';
+          _errorMessage =
+              'Google sign-in verification failed with authority server.';
         });
+      }
+    } on ApiException catch (apiErr) {
+      if (mounted) {
+        setState(() => _isGoogleLoading = false);
+        if (apiErr.statusCode == 403) {
+          _showPendingApprovalDialog(apiErr.message);
+        } else {
+          setState(() => _errorMessage = apiErr.message);
+        }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isGoogleLoading = false;
-          _errorMessage = 'Google Authentication Error: ${e.toString()}';
         });
+        final errStr = e.toString();
+        if (errStr.contains('10') || errStr.contains('sign_in_failed')) {
+          _showGoogleSetupDialog(
+            title: 'Google Play Services Configuration',
+            message:
+                'Google Sign-In requires OAuth configuration in Google Cloud:\n\n'
+                '1. Go to Google Cloud Console (APIs & Services > Credentials)\n'
+                '2. Add an Android OAuth Client ID with:\n'
+                '   Package name: dz.aquasafe.frontend\n'
+                '   SHA-1 fingerprint: 67:0E:23:9A:3B:1D:14:4A:C8:CD:8F:F9:2E:EE:32:33:66:C7:04:DA\n'
+                '3. Set the Web Client ID in ApiConstants.googleServerClientId.\n\n'
+                'In the meantime, log in directly using the pre-filled supervisor credentials!',
+          );
+        } else {
+          setState(() {
+            _errorMessage = 'Google Authentication: $errStr';
+          });
+        }
       }
     }
+  }
+
+  void _showPendingApprovalDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.hourglass_top_rounded,
+            color: Colors.orange, size: 40),
+        title: const Text('Registration Submitted'),
+        content: Text(
+          message.isNotEmpty
+              ? message
+              : 'Your Google account has been registered as a candidate administrator! Waiting for supervisor approval before login.',
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showGoogleSetupDialog(
+      {required String title, required String message}) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.info_outline_rounded,
+            color: AppBranding.primaryBlue, size: 40),
+        title: Text(title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child:
+              Text(message, style: const TextStyle(fontSize: 13, height: 1.4)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('GOT IT'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

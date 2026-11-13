@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../core/branding/app_branding.dart';
+import '../../core/services/auth_service.dart';
 import '../../core/services/report_service.dart';
+import '../../core/services/supervisor_service.dart';
+import '../../models/administrator.dart';
 import '../../models/dashboard_stats.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../report_details/report_details_screen.dart';
+import '../supervisor/supervisor_dashboard_screen.dart';
 import 'widgets/stat_card.dart';
 import 'widgets/recent_report_item.dart';
 
@@ -21,6 +25,8 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   DashboardStats? _stats;
+  Administrator? _currentAdmin;
+  int _pendingAdminCount = 0;
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -37,10 +43,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     });
 
     try {
-      final stats = await ReportApiService.getDashboardStats();
+      final statsFuture = ReportApiService.getDashboardStats();
+      final adminFuture = AuthService.getCurrentAdmin();
+
+      final stats = await statsFuture;
+      final admin = await adminFuture;
+
+      int pendingCount = 0;
+      if (admin != null && admin.isSupervisor) {
+        try {
+          pendingCount = await SupervisorService.getPendingCount();
+        } catch (_) {}
+      }
+
       if (mounted) {
         setState(() {
           _stats = stats;
+          _currentAdmin = admin;
+          _pendingAdminCount = pendingCount;
           _isLoading = false;
         });
       }
@@ -112,6 +132,125 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Supervisor Authority Console Card (Visible only to SUPERVISOR)
+            if (_currentAdmin != null && _currentAdmin!.isSupervisor) ...[
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(
+                    color: _pendingAdminCount > 0
+                        ? Colors.purple
+                        : AppBranding.cardBorder,
+                    width: _pendingAdminCount > 0 ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.purple.shade50.withOpacity(0.5),
+                        Colors.white,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.purple.withOpacity(0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.admin_panel_settings_rounded,
+                              color: Colors.purple,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Supervisor Authority Console',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.purple,
+                                  ),
+                                ),
+                                Text(
+                                  _pendingAdminCount > 0
+                                      ? '$_pendingAdminCount candidate admin account request${_pendingAdminCount > 1 ? "s" : ""} waiting for your review'
+                                      : 'Manage administrator accounts, permissions, and Wilaya authority',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: _pendingAdminCount > 0
+                                        ? Colors.deepOrange
+                                        : AppBranding.secondaryText,
+                                    fontWeight: _pendingAdminCount > 0
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 11),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          icon: Badge(
+                            isLabelVisible: _pendingAdminCount > 0,
+                            label: Text('$_pendingAdminCount'),
+                            backgroundColor: Colors.red,
+                            child: const Icon(Icons.how_to_reg_rounded, size: 18),
+                          ),
+                          label: Text(
+                            _pendingAdminCount > 0
+                                ? 'Accept / Review Requests ($_pendingAdminCount Pending)'
+                                : 'Open Supervisor Authority Console',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const SupervisorDashboardScreen(),
+                              ),
+                            );
+                            _fetchDashboard();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             // KPI Grid
             GridView.count(
               crossAxisCount: 2,

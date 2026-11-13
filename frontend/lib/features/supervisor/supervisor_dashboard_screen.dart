@@ -58,6 +58,60 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen>
     }
   }
 
+  Future<void> _quickDecision(Administrator admin, String action) async {
+    final actionLabel = action == 'APPROVE' ? 'Approve' : 'Reject';
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('$actionLabel Administrator Request?'),
+        content: Text(
+            'Are you sure you want to ${actionLabel.toLowerCase()} the account for ${admin.name} (${admin.email})?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: action == 'APPROVE'
+                  ? AppBranding.statusResolved
+                  : AppBranding.statusUnderRepair,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(actionLabel.toUpperCase()),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await SupervisorService.reviewApplication(
+        adminId: admin.id,
+        action: action,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Application for ${admin.name} was ${action == "APPROVE" ? "approved" : "rejected"} successfully.'),
+            backgroundColor: action == 'APPROVE'
+                ? AppBranding.statusResolved
+                : AppBranding.statusUnderRepair,
+          ),
+        );
+      }
+      _loadAdministrators();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _toggleActiveState(Administrator admin) async {
     final newActive = !admin.isActive;
     try {
@@ -383,26 +437,53 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen>
                           ],
                         ),
                         if (admin.isPending)
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              backgroundColor: AppBranding.primaryBlue,
-                            ),
-                            icon: const Icon(Icons.rate_review_outlined,
-                                size: 16),
-                            label: const Text('Review',
-                                style: TextStyle(fontSize: 12)),
-                            onPressed: () async {
-                              final res = await Navigator.push<bool>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => AdminCandidateDetailsScreen(
-                                      candidate: admin),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  foregroundColor: AppBranding.statusUnderRepair,
+                                  side: const BorderSide(
+                                      color: AppBranding.statusUnderRepair),
                                 ),
-                              );
-                              if (res == true) _loadAdministrators();
-                            },
+                                icon: const Icon(Icons.close_rounded, size: 14),
+                                label: const Text('Reject',
+                                    style: TextStyle(fontSize: 11)),
+                                onPressed: () => _quickDecision(admin, 'REJECT'),
+                              ),
+                              const SizedBox(width: 6),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  backgroundColor: AppBranding.statusResolved,
+                                ),
+                                icon: const Icon(Icons.check_rounded, size: 14),
+                                label: const Text('Approve',
+                                    style: TextStyle(fontSize: 11)),
+                                onPressed: () =>
+                                    _quickDecision(admin, 'APPROVE'),
+                              ),
+                              const SizedBox(width: 4),
+                              IconButton(
+                                icon: const Icon(Icons.edit_note_rounded,
+                                    size: 22, color: AppBranding.primaryBlue),
+                                tooltip: 'Details & Wilaya Permissions',
+                                onPressed: () async {
+                                  final res = await Navigator.push<bool>(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          AdminCandidateDetailsScreen(
+                                              candidate: admin),
+                                    ),
+                                  );
+                                  if (res == true) _loadAdministrators();
+                                },
+                              ),
+                            ],
                           )
                         else
                           Text(

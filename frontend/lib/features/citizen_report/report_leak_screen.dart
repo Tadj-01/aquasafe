@@ -96,10 +96,19 @@ class _ReportLeakScreenState extends State<ReportLeakScreen> {
       );
       if (picked != null) {
         final bytes = await picked.readAsBytes();
+        String name = picked.name;
+        final lower = name.toLowerCase();
+        if (!lower.endsWith('.jpg') &&
+            !lower.endsWith('.jpeg') &&
+            !lower.endsWith('.png') &&
+            !lower.endsWith('.webp')) {
+          name = '${name.isEmpty ? "leak_photo" : name}.jpg';
+        }
+
         setState(() {
           _selectedImage = picked;
           _imageBytes = bytes;
-          _imageName = picked.name;
+          _imageName = name;
           _errorMessage = null;
         });
       }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_exception.dart';
 
@@ -141,11 +142,29 @@ class ApiClient {
         request.headers['Authorization'] = 'Bearer $token';
       }
 
-      // Add multipart file from bytes (works seamlessly on Mobile, Web & Desktop)
+      // Determine proper mime content type
+      String sanitizedFilename = filename;
+      final lowerName = filename.toLowerCase();
+      MediaType mediaType;
+
+      if (lowerName.endsWith('.png')) {
+        mediaType = MediaType('image', 'png');
+      } else if (lowerName.endsWith('.webp')) {
+        mediaType = MediaType('image', 'webp');
+      } else if (lowerName.endsWith('.jpeg') || lowerName.endsWith('.jpg')) {
+        mediaType = MediaType('image', 'jpeg');
+      } else {
+        // Default to JPEG if extension missing or unknown
+        sanitizedFilename = '$filename.jpg';
+        mediaType = MediaType('image', 'jpeg');
+      }
+
+      // Add multipart file from bytes with explicit image MIME type
       final multipartFile = http.MultipartFile.fromBytes(
         fileField,
         fileBytes,
-        filename: filename,
+        filename: sanitizedFilename,
+        contentType: mediaType,
       );
       request.files.add(multipartFile);
 

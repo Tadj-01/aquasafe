@@ -5,7 +5,7 @@ class ApiConstants {
   // Change this to your computer's LAN IP so your phone can
   // reach the backend. Run `hostname -I` on Linux to find it.
   // ──────────────────────────────────────────────────────────
-  static const String _lanIp = '192.168.100.6';
+  /*static const String _lanIp = '192.168.100.6';
 
   /// Resolves the correct backend URL depending on where the app runs.
   static String get baseUrl {
@@ -13,7 +13,13 @@ class ApiConstants {
       return 'http://localhost:8000';
     }
     return 'http://$_lanIp:8000';
+  }*/
+  static String get baseUrl {
+    return 'https://aquasafe-api.onrender.com';
   }
+
+  /// Google OAuth Web Client ID for Android ID Token verification (optional, if using Google Auth)
+  static const String googleServerClientId = '';
 
   static String get apiPrefix => '$baseUrl/api';
 

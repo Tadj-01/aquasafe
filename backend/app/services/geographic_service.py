@@ -203,14 +203,18 @@ class GeographicService:
         results = syscli_algeria.search(query, limit=limit)
         output = []
         for r in results:
+            w_code = r.wilaya.code if r.wilaya else r.commune.wilaya_code
+            coords = WILAYA_CENTROIDS.get(w_code)
             output.append(
                 {
                     "commune_code": r.commune.code,
                     "commune_name_fr": r.commune.name_fr,
                     "commune_name_ar": r.commune.name_ar,
-                    "wilaya_code": r.wilaya.code if r.wilaya else r.commune.wilaya_code,
+                    "wilaya_code": w_code,
                     "wilaya_name_fr": r.wilaya.name_fr if r.wilaya else "",
                     "wilaya_name_ar": r.wilaya.name_ar if r.wilaya else "",
+                    "latitude": coords[0] if coords else None,
+                    "longitude": coords[1] if coords else None,
                     "score": r.score,
                 }
             )
